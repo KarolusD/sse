@@ -1,14 +1,26 @@
-import { event } from 'sveltekit-server-sent-events'
+import type { RequestHandler } from '@sveltejs/kit';
 
-const delay = (milliseconds: number) =>  new Promise(r => setTimeout(r, milliseconds))
-
-export function GET() {
-	return event(async emit => {
-    let counter = 0
-		while (counter > 10) {
-			emit(`${counter} ${new Date()}`)
-			await delay(1000)
-      counter++
+export const GET = (async () => {
+	let interval: number;
+	let controller: ReadableStreamDefaultController<string>;
+	const stream = new ReadableStream({
+		start(ctr) {
+			controller = ctr;
+			interval = setInterval(() => {
+				controller.enqueue(`data: ping ${new Date()}\n\n`);
+			}, 3000);
+		},
+		cancel() {
+			clearInterval(interval);
 		}
-	}).toResponse()
-}
+	});
+
+	return new Response(stream, {
+		headers: {
+			'Content-Type': 'text/event-stream',
+			'Cache-Control': 'no-cache',
+			Connection: 'keep-alive',
+			'Access-Control-Allow-Origin': '*' // Allow requests from all origins (update as needed)
+		}
+	});
+}) satisfies RequestHandler;
